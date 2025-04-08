@@ -2,10 +2,8 @@
 
 import { motion } from "framer-motion";
 import { ShoppingBag } from "lucide-react";
-import { QRCodeSVG } from "qrcode.react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-
 import CartDrawer from "@/components/OrderSummary/CartDrawer";
 import Header from "@/components/OrderSummary/Header";
 import StatusAnimation from "@/components/OrderSummary/StatusAnimation";
@@ -14,6 +12,14 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { formatCurrency } from "@/lib/utils";
 import { Order, OrderItem, OrderStatus } from "@/types/order";
 import { DialogTitle } from "@radix-ui/react-dialog";
+import dynamic from "next/dynamic";
+
+const QRCodeSVG = dynamic(
+  () => import("qrcode.react").then((mod) => mod.QRCodeSVG),
+  {
+    ssr: false,
+  }
+);
 
 // Mock data for demo
 const mockOrderItems: OrderItem[] = [

@@ -1,7 +1,9 @@
-import React from "react";
+"use client";
+
 import { OrderStatus } from "@/types/order";
 import { motion } from "framer-motion";
-import { Check, Utensils, ShoppingBag, Clock } from "lucide-react";
+import { Check, Clock, ShoppingBag, Utensils } from "lucide-react";
+import React from "react";
 
 interface TimelineProps {
   currentStatus: OrderStatus;

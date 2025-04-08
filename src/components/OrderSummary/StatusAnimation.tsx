@@ -1,3 +1,5 @@
+"use client";
+
 import {
   getAnimationData,
   getShortStatus,
@@ -7,9 +9,9 @@ import {
 } from "@/helpers/orderSummaryHelpers";
 import { OrderStatus } from "@/types/order";
 import { AnimatePresence, motion } from "framer-motion";
-import Lottie from "lottie-react";
 import { Check, ChefHat, Clock, ShoppingBag } from "lucide-react";
 import React from "react";
+import ClientLottie from "./ClientLottie";
 
 interface StatusAnimationProps {
   currentStatus: OrderStatus;
@@ -30,18 +32,9 @@ const StatusAnimation: React.FC<StatusAnimationProps> = ({ currentStatus }) => {
             damping: 20,
           }}
         >
-          <Lottie
+          <ClientLottie
             animationData={getAnimationData(status)}
-            loop={true}
-            autoplay={true}
             className="w-full h-full"
-            style={{ background: "transparent" }}
-            rendererSettings={{
-              preserveAspectRatio: "xMidYMid slice",
-              //   clearCanvas: true,
-              progressiveLoad: true,
-              hideOnTransparent: true,
-            }}
           />
         </motion.div>
       </div>
