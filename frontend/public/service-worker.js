@@ -9,8 +9,8 @@ self.addEventListener("push", (event) => {
     const title = data.title || "Order Update";
     const options = {
       body: data.body || "Your order status has been updated",
-      icon: "/icon-192x192.png",
-      badge: "/badge-72x72.png",
+      icon: "/dynish-logo.png",
+      badge: "dynish-logo.png",
     };
 
     event.waitUntil(
