@@ -5,10 +5,11 @@
   "main": "index.js",
   "scripts": {
     "dev": "nodemon api/index.ts",
-    "build": "tsc",
+    "build": "prisma generate && tsc",
     "start": "node dist/api/index.js",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev"
+    "prisma:migrate": "prisma migrate dev",
+    "seed": "ts-node prisma/seed.ts"
   },
   "keywords": [],
   "author": "",

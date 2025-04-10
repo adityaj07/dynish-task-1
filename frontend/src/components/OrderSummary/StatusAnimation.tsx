@@ -41,6 +41,8 @@ const StatusAnimation: React.FC<StatusAnimationProps> = ({ currentStatus }) => {
     );
   };
 
+  console.log("StatusAnimation rendering with status:", currentStatus);
+
   return (
     <div className="flex flex-col items-center justify-center w-full max-w-md mx-auto pt-28 mt-2 relative z-0">
       <AnimatePresence mode="wait">

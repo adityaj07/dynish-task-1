@@ -6,7 +6,12 @@ import { env } from "../src/utils/validateEnv";
 
 const app = express();
 app.use(express.json());
-app.use(cors({}));
+app.use(
+  cors({
+    credentials: true,
+    origin: env.FE_URL,
+  })
+);
 
 app.use(`/api/${env.API_VERSION}`, indexRouter);
 

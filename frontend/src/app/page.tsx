@@ -1,18 +1,24 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { ShoppingBag } from "lucide-react";
-import { useEffect, useState } from "react";
-import { toast } from "sonner";
 import CartDrawer from "@/components/OrderSummary/CartDrawer";
 import Header from "@/components/OrderSummary/Header";
 import StatusAnimation from "@/components/OrderSummary/StatusAnimation";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import {
+  registerServiceWorker,
+  requestNotificationPermission,
+  subscribeUserToPush,
+} from "@/lib/pushNotifications";
 import { formatCurrency } from "@/lib/utils";
 import { Order, OrderItem, OrderStatus } from "@/types/order";
 import { DialogTitle } from "@radix-ui/react-dialog";
+import axios from "axios";
+import { motion } from "framer-motion";
+import { ShoppingBag } from "lucide-react";
 import dynamic from "next/dynamic";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 const QRCodeSVG = dynamic(
   () => import("qrcode.react").then((mod) => mod.QRCodeSVG),
@@ -20,6 +26,9 @@ const QRCodeSVG = dynamic(
     ssr: false,
   }
 );
+
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api/v1";
 
 // Mock data for demo
 const mockOrderItems: OrderItem[] = [
@@ -68,30 +77,169 @@ const OrderSummaryPage = () => {
   const [showQrCode, setShowQrCode] = useState(false);
   const [prevStatus, setPrevStatus] = useState<OrderStatus>(order.status);
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [pushNotificationsEnabled, setPushNotificationsEnabled] =
+    useState(false);
+  const [pollingActive, setPollingActive] = useState(true);
 
-  // Simulate order status updates
-  useEffect(() => {
-    const statuses = [
-      OrderStatus.NEW,
-      OrderStatus.COOKING,
-      OrderStatus.READY,
-      OrderStatus.COMPLETED,
-    ];
-
-    const intervalId = setInterval(() => {
-      const currentIndex = statuses.indexOf(order.status);
-      if (currentIndex < statuses.length - 1) {
-        setOrder((prevOrder) => ({
-          ...prevOrder,
-          status: statuses[currentIndex + 1],
-        }));
-      } else {
-        clearInterval(intervalId);
+  // Fetch order status from backend
+  const fetchOrderStatus = async () => {
+    try {
+      // Only make the API call if polling is active
+      if (!pollingActive) {
+        return;
       }
-    }, 10000); // Updating the status every 10 seconds
 
-    return () => clearInterval(intervalId);
-  }, [order.status]);
+      // console.log("Polling for order status updates");
+      const response = await axios.get(`${API_URL}/orders/${order.id}/status`);
+
+      if (response.data && response.data.orderStatus) {
+        const newStatus = response.data.orderStatus;
+
+        // Only update if status has changed
+        if (newStatus !== order.status) {
+          // console.log(
+          //   `Polling detected status change: ${order.status} → ${newStatus}`
+          // );
+
+          setOrder((prevOrder) => ({
+            ...prevOrder,
+            status: newStatus as OrderStatus,
+          }));
+        }
+      }
+    } catch (error) {
+      console.error("Failed to fetch order status:", error);
+    }
+  };
+
+  // Set up push notification handling
+  useEffect(() => {
+    async function setupPushNotifications() {
+      // Only run on client side
+      if (typeof window === "undefined") return;
+
+      try {
+        // Register service worker
+        const swRegistered = await registerServiceWorker();
+        if (!swRegistered) {
+          console.log(
+            "Service worker registration failed, falling back to polling"
+          );
+          return;
+        }
+
+        // Request for permission
+        const permissionGranted = await requestNotificationPermission();
+        if (!permissionGranted) {
+          console.log(
+            "Notification permission denied, falling back to polling"
+          );
+          return;
+        }
+
+        // Subscribe user to push notifications for this order
+        const subscribed = await subscribeUserToPush(order.id);
+
+        // If everything succeeded, disable polling
+        if (subscribed) {
+          setPushNotificationsEnabled(true);
+          setPollingActive(false);
+          console.log("Push notifications enabled, polling disabled");
+        }
+      } catch (error) {
+        console.error("Failed to set up push notifications:", error);
+      }
+    }
+
+    setupPushNotifications();
+  }, [order.id]);
+
+  // Listen for order status updates from push notifications
+  useEffect(() => {
+    const handleStatusUpdate = (event: CustomEvent) => {
+      const { orderId, status } = event.detail;
+
+      // Convert orderId to string for comparison
+      if (String(orderId) === order.id && status) {
+        console.log(`Updating status to: ${status}`);
+        const statusMap = {
+          NEW: OrderStatus.NEW,
+          COOKING: OrderStatus.COOKING,
+          READY: OrderStatus.READY,
+          COMPLETED: OrderStatus.COMPLETED,
+        };
+        const validStatus = status as keyof typeof statusMap;
+        const newStatus = statusMap[validStatus];
+
+        setOrder((prevOrder) => {
+          console.log(`Setting status: ${prevOrder.status} → ${newStatus}`);
+          return { ...prevOrder, status: newStatus };
+        });
+
+        setPrevStatus(newStatus);
+      } else {
+        console.log(
+          `ID comparison failed: ${orderId} (${typeof orderId}) !== ${
+            order.id
+          } (${typeof order.id})`
+        );
+      }
+    };
+
+    window.addEventListener(
+      "orderStatusUpdate",
+      handleStatusUpdate as EventListener
+    );
+
+    return () => {
+      window.removeEventListener(
+        "orderStatusUpdate",
+        handleStatusUpdate as EventListener
+      );
+    };
+  }, [order.id]);
+
+  useEffect(() => {
+    if (pushNotificationsEnabled) {
+      // If push notifications are enabled, we don't need polling
+      setPollingActive(false);
+      return;
+    }
+
+    // Initial fetch
+    fetchOrderStatus();
+
+    // Set up polling interval - adaptive based on document visibility
+    let intervalId: NodeJS.Timeout;
+    const pollingInterval = 30000; // 30 seconds when tab is visible
+    const backgroundPollingInterval = 60000; // 60 seconds when tab is in background
+
+    // Set initial interval based on visibility
+    intervalId = setInterval(
+      fetchOrderStatus,
+      document.visibilityState === "visible"
+        ? pollingInterval
+        : backgroundPollingInterval
+    );
+
+    // Adapt polling frequency based on visibility state
+    const handleVisibilityChange = () => {
+      clearInterval(intervalId);
+      intervalId = setInterval(
+        fetchOrderStatus,
+        document.visibilityState === "visible"
+          ? pollingInterval
+          : backgroundPollingInterval
+      );
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [order.id, pushNotificationsEnabled]);
 
   // toast notification to show when status changes
   useEffect(() => {
@@ -140,7 +288,10 @@ const OrderSummaryPage = () => {
           />
         </div>
 
-        <StatusAnimation currentStatus={order.status} />
+        <StatusAnimation
+          currentStatus={order.status}
+          key={`status-${order.status}`}
+        />
 
         {/* Estimated time for food to get prerpared */}
         <motion.div

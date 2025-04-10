@@ -1,3 +1,4 @@
+import { OrderStatus } from "@prisma/client";
 import webpush from "web-push";
 import { prisma } from "../lib/prisma";
 import { StatusCodes } from "../lib/StatusCodes";
@@ -11,6 +12,7 @@ webpush.setVapidDetails(
 
 export const sendNotification = async (orderId: number, payload: any) => {
   try {
+    // Get all the subs for this order
     const subs = await prisma.pushSubscription.findMany({
       where: {
         orderId,
@@ -22,6 +24,7 @@ export const sendNotification = async (orderId: number, payload: any) => {
       return { success: true, message: "No subscriptions to notify" };
     }
 
+    // send notifs to each sub
     const notificationPromises = subs.map(async (sub) => {
       try {
         await webpush.sendNotification(
@@ -63,5 +66,20 @@ export const sendNotification = async (orderId: number, payload: any) => {
   } catch (error) {
     console.error("Failed to send notifications:", error);
     return { success: false, error };
+  }
+};
+
+export const getStatusUpdateMessage = (status: OrderStatus): string => {
+  switch (status) {
+    case "NEW":
+      return "Your order has been received";
+    case "COOKING":
+      return "Your order is now being prepared";
+    case "READY":
+      return "Your order is ready for pickup";
+    case "COMPLETED":
+      return "Your order has been completed";
+    default:
+      return "Your order status has been updated";
   }
 };

@@ -1,8 +1,8 @@
 export enum OrderStatus {
-  NEW = "New Order",
-  COOKING = "Cooking Order",
-  READY = "Ready Order",
-  COMPLETED = "Complete Order",
+  NEW = "NEW",
+  COOKING = "COOKING",
+  READY = "READY",
+  COMPLETED = "COMPLETED",
 }
 
 export interface OrderItem {
